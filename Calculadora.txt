@@ -1,44 +1,178 @@
-// Este módulo se agrega dentro del mismo proyecto
-// Requiere instalar: npm install jspdf html2canvas
-
+import React, { useState } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
-export const generarPDF = async () => {
-  const input = document.getElementById("reporte");
+// CONFIGURACIÓN DE ROLES
+const rolesConfig = {
+  "12x24": { horasDia: 24 },
+  "12x36": { horasDia: 24 },
+  "24x24": { horasDia: 24 },
+  "24x48": { horasDia: 24 },
+  "12x12x6": { horasDia: 12 },
+  "12x12x5": { horasDia: 10 }
+};
+export default function App() {
+  const [data, setData] = useState({
+    elementos: 9,
+    horasActuales: 56,
+    horasObjetivo: 50,
+    posiciones: 3,
+    dias: 7,
+    ausentismo: 10,
+    factorCobertura: 1.3,
+    salario: 12000,
+    rol: "12x24"
+  });
+  const [result, setResult] = useState(null);
+  // FUNCIÓN PRINCIPAL DE CÁLCULO
+  const calcular = () => {
+    const horasDia = rolesConfig[data.rol].horasDia;
+    const horasActualesTotal = data.elementos * data.horasActuales;
+    const horasRequeridas = data.posiciones * horasDia * data.dias;
+    const horasNuevas = data.elementos * data.horasObjetivo;
+    const deficitHoras = horasRequeridas - horasNuevas;
+    const elementosBase = Math.ceil(horasRequeridas / data.horasObjetivo);
 
-  const canvas = await html2canvas(input);
-  const imgData = canvas.toDataURL("image/png");
 
-  const pdf = new jsPDF("p", "mm", "a4");
+    const elementosAjustados = Math.ceil(
+      elementosBase * data.factorCobertura * (1 + data.ausentismo / 100)
+    );
 
-  const imgWidth = 210;
-  const pageHeight = 295;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  let heightLeft = imgHeight;
 
-  let position = 0;
+    const incremento =
+      ((elementosAjustados - data.elementos) / data.elementos) * 100;
 
-  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
 
-  while (heightLeft >= 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
+    const costoActual = data.elementos * data.salario;
+    const costoNuevo = elementosAjustados * data.salario;
+
+
+    let nivel;
+    if (deficitHoras <= 0) nivel = "🟢 Cobertura completa";
+    else if (deficitHoras <= 40) nivel = "🟡 Riesgo controlado";
+    else nivel = "🔴 Riesgo crítico";
+
+
+    setResult({
+      horasActualesTotal,
+      horasRequeridas,
+      horasNuevas,
+      deficitHoras,
+      elementosBase,
+      elementosAjustados,
+      incremento,
+      costoActual,
+      costoNuevo,
+      nivel
+    });
+  };
+
+
+  // GENERAR PDF
+  const generarPDF = async () => {
+    const input = document.getElementById("reporte");
+    const canvas = await html2canvas(input);
+    const imgData = canvas.toDataURL("image/png");
+
+
+    const pdf = new jsPDF("p", "mm", "a4");
+
+
+    const imgWidth = 210;
+    const pageHeight = 295;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+
     pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
-  }
 
-  pdf.save("Reporte_Operativo.pdf");
-};
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+    pdf.save("Reporte_Operativo.pdf");
+  };
 
-// USO EN TU APP
-// 1. Envuelve la sección de resultados con:
-// <div id="reporte"> ... </div>
-//
-// 2. Agrega botón:
-// <button onClick={generarPDF}>Generar PDF</button>
+  // BARRA VISUAL
+  const barra = (valor, total, color) => {
+    const porcentaje = Math.max(0, Math.min(100, (valor / total) * 100));
+    return (
+      <div style={{ background: "#eee", borderRadius: 5 }}>
+        <div
+          style={{
+            width: porcentaje + "%",
+            background: color,
+            height: 10,
+            borderRadius: 5
+          }}
+        />
+      </div>
+    );
+  };
 
-// 3. Esto exportará el dashboard completo en PDF listo para cliente
+  return (
+    <div style={{ padding: 20, fontFamily: "Arial" }}>
+      <h1>Simulador Operativo Seguridad Privada</h1>
 
+      {/* INPUTS */}
+      <div style={{ display: "grid", gap: 10, maxWidth: 400 }}>
+        <select
+          value={data.rol}
+          onChange={(e) => setData({ ...data, rol: e.target.value })}
+        >
+          {Object.keys(rolesConfig).map((rol) => (
+            <option key={rol}>{rol}</option>
+          ))}
+        </select>
 
+        <input placeholder="Elementos" value={data.elementos} onChange={e => setData({ ...data, elementos: Number(e.target.value) })} />
+        <input placeholder="Horas actuales" value={data.horasActuales} onChange={e => setData({ ...data, horasActuales: Number(e.target.value) })} />
+        <input placeholder="Horas objetivo" value={data.horasObjetivo} onChange={e => setData({ ...data, horasObjetivo: Number(e.target.value) })} />
+        <input placeholder="Posiciones" value={data.posiciones} onChange={e => setData({ ...data, posiciones: Number(e.target.value) })} />
+        <input placeholder="Días" value={data.dias} onChange={e => setData({ ...data, dias: Number(e.target.value) })} />
+        <input placeholder="Ausentismo (%)" value={data.ausentismo} onChange={e => setData({ ...data, ausentismo: Number(e.target.value) })} />
+        <input placeholder="Factor cobertura" value={data.factorCobertura} onChange={e => setData({ ...data, factorCobertura: Number(e.target.value) })} />
+        <input placeholder="Salario mensual" value={data.salario} onChange={e => setData({ ...data, salario: Number(e.target.value) })} />
+
+        <button onClick={calcular}>Calcular</button>
+      </div>
+
+      {/* DASHBOARD */}
+      {result && (
+        <div id="reporte" style={{ marginTop: 30 }}>
+          <h2>Dashboard Operativo</h2>
+          <p>{result.nivel}</p>
+
+          <h3>Cobertura de Horas</h3>
+          {barra(result.horasNuevas, result.horasRequeridas, "green")}
+          <p>{result.horasNuevas} / {result.horasRequeridas}</p>
+
+          <h3>Plantilla</h3>
+          {barra(data.elementos, result.elementosAjustados, "blue")}
+          <p>Actual: {data.elementos} | Requerido: {result.elementosAjustados}</p>
+
+          <h3>Impacto Financiero</h3>
+          {barra(result.costoActual, result.costoNuevo, "orange")}
+          <p>${result.costoActual.toLocaleString()} → ${result.costoNuevo.toLocaleString()}</p>
+
+          <h3>Indicadores</h3>
+          <p>Déficit: {result.deficitHoras}</p>
+          <p>Incremento: {result.incremento.toFixed(2)}%</p>
+        </div>
+      )}
+
+      {/* BOTÓN PDF */}
+      {result && (
+        <button style={{ marginTop: 20 }} onClick={generarPDF}>
+          Descargar Reporte PDF
+        </button>
+      )}
+    </div>
+  );
+}
