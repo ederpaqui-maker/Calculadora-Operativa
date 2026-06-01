@@ -1,0 +1,44 @@
+// Este módulo se agrega dentro del mismo proyecto
+// Requiere instalar: npm install jspdf html2canvas
+
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
+export const generarPDF = async () => {
+  const input = document.getElementById("reporte");
+
+  const canvas = await html2canvas(input);
+  const imgData = canvas.toDataURL("image/png");
+
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const imgWidth = 210;
+  const pageHeight = 295;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  let heightLeft = imgHeight;
+
+  let position = 0;
+
+  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft >= 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+
+  pdf.save("Reporte_Operativo.pdf");
+};
+
+// USO EN TU APP
+// 1. Envuelve la sección de resultados con:
+// <div id="reporte"> ... </div>
+//
+// 2. Agrega botón:
+// <button onClick={generarPDF}>Generar PDF</button>
+
+// 3. Esto exportará el dashboard completo en PDF listo para cliente
+
+
